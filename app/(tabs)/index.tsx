@@ -10,6 +10,7 @@ import { DailySignCard } from '@/components/DailySignCard';
 import { SAMPLES } from '@/lib/dailyNotes';
 import { translate, ApiError } from '@/lib/api';
 import {
+  loadAiConfig,
   loadSettings,
   saveHistoryEntry,
   saveFavoriteEntry,
@@ -31,18 +32,21 @@ export default function TranslateScreen() {
     setLastSubmit(payload);
     setLastMode(mode);
     try {
-      const data = await translate({
-        mode,
-        text: payload.text,
-        scenario: payload.scenario,
-        context: payload.context,
-        options: {
-          focus: payload.focus,
-          tone: payload.tone,
-          relationship: payload.relationship,
-          goal: payload.goal,
+      const data = await translate(
+        {
+          mode,
+          text: payload.text,
+          scenario: payload.scenario,
+          context: payload.context,
+          options: {
+            focus: payload.focus,
+            tone: payload.tone,
+            relationship: payload.relationship,
+            goal: payload.goal,
+          },
         },
-      });
+        loadAiConfig()
+      );
       setResult(data);
       const settings = loadSettings();
       if (settings.autoSaveHistory) {

@@ -44,6 +44,12 @@ export interface TranslationData {
   uncertaintyNote?: string;
 }
 
+export interface AiConfig {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+}
+
 export interface TranslateRequest {
   mode: Mode;
   text: string;

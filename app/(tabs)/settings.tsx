@@ -1,11 +1,14 @@
 import React from 'react';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
-import { Trash2 } from 'lucide-react-native';
+import { Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Key, Trash2 } from 'lucide-react-native';
 import { theme } from '@/constants/theme';
 import { Card, ScreenScroll } from '@/components/ui';
 import {
+  clearAiConfig,
   clearAllLocalData,
+  loadAiConfig,
   loadSettings,
+  saveAiConfig,
   saveSettings,
   storageAvailable,
 } from '@/lib/storage';
@@ -14,11 +17,50 @@ export default function SettingsScreen() {
   const [autoSave, setAutoSave] = React.useState(true);
   const [confirmClear, setConfirmClear] = React.useState(false);
   const [cleared, setCleared] = React.useState(false);
+  const [apiKey, setApiKey] = React.useState('');
+  const [baseUrl, setBaseUrl] = React.useState('');
+  const [model, setModel] = React.useState('');
+  const [showKey, setShowKey] = React.useState(false);
+  const [aiSaved, setAiSaved] = React.useState(false);
+  const [aiError, setAiError] = React.useState<string | null>(null);
   const canPersist = storageAvailable();
 
   React.useEffect(() => {
     setAutoSave(loadSettings().autoSaveHistory);
+    const ai = loadAiConfig();
+    if (ai) {
+      setApiKey(ai.apiKey);
+      setBaseUrl(ai.baseUrl);
+      setModel(ai.model);
+    }
   }, []);
+
+  const saveAi = () => {
+    setAiError(null);
+    const key = apiKey.trim();
+    const modelName = model.trim();
+    if (!key || !modelName) {
+      setAiError('API Key 和模型名称都不能为空。');
+      return;
+    }
+    saveAiConfig({
+      apiKey: key,
+      baseUrl: baseUrl.trim(),
+      model: modelName,
+    });
+    setAiSaved(true);
+    setTimeout(() => setAiSaved(false), 2000);
+  };
+
+  const removeAi = () => {
+    clearAiConfig();
+    setApiKey('');
+    setBaseUrl('');
+    setModel('');
+    setAiError(null);
+  };
+
+  const aiConfigured = apiKey.trim().length > 0 && model.trim().length > 0;
 
   const toggleAutoSave = (value: boolean) => {
     setAutoSave(value);
@@ -43,6 +85,69 @@ export default function SettingsScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>设置</Text>
       </View>
+
+      <Card style={styles.section}>
+        <View style={styles.aiHeader}>
+          <Key size={16} color={aiConfigured ? theme.primaryDark : theme.textSecondary} strokeWidth={2} />
+          <Text style={styles.rowTitle}>AI 服务配置</Text>
+          <Text style={[styles.aiStatus, { color: aiConfigured ? theme.primaryDark : theme.orangeDark }]}>
+            {aiConfigured ? '已配置' : '未配置'}
+          </Text>
+        </View>
+        <Text style={styles.rowDesc}>
+          填写你使用的 AI 服务信息，翻译功能即可使用。配置只保存在本机，不会上传到应用服务器。
+        </Text>
+        <Text style={styles.fieldLabel}>API Key（必填）</Text>
+        <View style={styles.keyRow}>
+          <TextInput
+            style={[styles.input, styles.inputFlex]}
+            value={apiKey}
+            onChangeText={setApiKey}
+            placeholder="sk-..."
+            placeholderTextColor={theme.textTertiary}
+            secureTextEntry={!showKey}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Pressable onPress={() => setShowKey(!showKey)} style={styles.eyeBtn}>
+            <Text style={styles.eyeText}>{showKey ? '隐藏' : '显示'}</Text>
+          </Pressable>
+        </View>
+        <Text style={styles.fieldLabel}>接口地址（可选，默认 OpenAI）</Text>
+        <TextInput
+          style={styles.input}
+          value={baseUrl}
+          onChangeText={setBaseUrl}
+          placeholder="https://api.openai.com/v1"
+          placeholderTextColor={theme.textTertiary}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <Text style={styles.fieldLabel}>模型名称（必填）</Text>
+        <TextInput
+          style={styles.input}
+          value={model}
+          onChangeText={setModel}
+          placeholder="例如 gpt-4o-mini"
+          placeholderTextColor={theme.textTertiary}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {aiError ? <Text style={styles.aiError}>{aiError}</Text> : null}
+        <View style={styles.aiBtnRow}>
+          <Pressable onPress={saveAi} style={styles.aiSaveBtn}>
+            <Text style={styles.aiSaveText}>{aiSaved ? '已保存' : '保存配置'}</Text>
+          </Pressable>
+          {aiConfigured && (
+            <Pressable onPress={removeAi} style={styles.aiRemoveBtn}>
+              <Text style={styles.aiRemoveText}>清除配置</Text>
+            </Pressable>
+          )}
+        </View>
+        <Text style={styles.fieldNote}>
+          支持兼容 OpenAI 接口格式的服务商；使用其他服务商时请同时填写接口地址。
+        </Text>
+      </Card>
 
       <Card style={styles.section}>
         <View style={styles.row}>
@@ -105,6 +210,89 @@ const styles = StyleSheet.create({
   section: {
     gap: 10,
     marginBottom: 12,
+  },
+  aiHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  aiStatus: {
+    fontFamily: theme.font.medium,
+    fontSize: 12,
+    marginLeft: 'auto',
+  },
+  fieldLabel: {
+    fontFamily: theme.font.medium,
+    fontSize: 12,
+    color: theme.textSecondary,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.bg,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontFamily: theme.font.regular,
+    fontSize: 14,
+    color: theme.text,
+  },
+  inputFlex: {
+    flex: 1,
+  },
+  keyRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  eyeBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+  },
+  eyeText: {
+    fontFamily: theme.font.medium,
+    fontSize: 12,
+    color: theme.primaryDark,
+  },
+  aiBtnRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 4,
+  },
+  aiSaveBtn: {
+    backgroundColor: theme.primaryDark,
+    borderRadius: theme.radius.sm,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  aiSaveText: {
+    fontFamily: theme.font.medium,
+    fontSize: 13,
+    color: '#FFFFFF',
+  },
+  aiRemoveBtn: {
+    borderRadius: theme.radius.sm,
+    borderWidth: 1,
+    borderColor: '#F0D5D5',
+    backgroundColor: theme.errorBg,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  aiRemoveText: {
+    fontFamily: theme.font.medium,
+    fontSize: 13,
+    color: theme.error,
+  },
+  aiError: {
+    fontFamily: theme.font.regular,
+    fontSize: 12,
+    color: theme.error,
+  },
+  fieldNote: {
+    fontFamily: theme.font.regular,
+    fontSize: 11,
+    color: theme.textTertiary,
+    lineHeight: 17,
   },
   row: {
     flexDirection: 'row',

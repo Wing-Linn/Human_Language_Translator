@@ -1,4 +1,4 @@
-import { TranslateRequest, TranslationData } from './types';
+import { AiConfig, TranslateRequest, TranslationData } from './types';
 
 export type ApiErrorKind = 'not_configured' | 'network' | 'timeout' | 'server' | 'invalid';
 
@@ -25,7 +25,10 @@ interface ApiFailure {
 
 const TIMEOUT_MS = 60000;
 
-export async function translate(req: TranslateRequest): Promise<TranslationData> {
+export async function translate(
+  req: TranslateRequest,
+  aiConfig?: AiConfig | null
+): Promise<TranslationData> {
   const baseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
   if (!baseUrl || !anonKey) {
@@ -44,7 +47,7 @@ export async function translate(req: TranslateRequest): Promise<TranslationData>
         Authorization: `Bearer ${anonKey}`,
         apikey: anonKey,
       },
-      body: JSON.stringify(req),
+      body: JSON.stringify({ ...req, aiConfig: aiConfig ?? undefined }),
       signal: controller.signal,
     });
   } catch (e) {
@@ -67,7 +70,10 @@ export async function translate(req: TranslateRequest): Promise<TranslationData>
     const err = body && body.success === false ? body.error : null;
     const code = err?.code ?? '';
     if (resp.status === 503 || code === 'AI_NOT_CONFIGURED') {
-      throw new ApiError('not_configured', 'AI 服务尚未配置。请联系开发者查看部署说明，配置好 AI 服务密钥后即可使用。');
+      throw new ApiError(
+        'not_configured',
+        'AI 服务尚未配置。请到「设置」里填写 AI 服务的 API Key 和模型名称。'
+      );
     }
     if (resp.status === 504) {
       throw new ApiError('timeout', '这次分析有点久，超时了。请稍后再试。');

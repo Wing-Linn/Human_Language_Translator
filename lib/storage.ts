@@ -4,6 +4,7 @@ const KEYS = {
   history: 'human-translator:history',
   favorites: 'human-translator:favorites',
   settings: 'human-translator:settings',
+  ai: 'human-translator:ai',
 } as const;
 
 const HISTORY_LIMIT = 100;
@@ -108,11 +109,45 @@ export function saveSettings(settings: AppSettings): void {
   writeJson(KEYS.settings, settings);
 }
 
+export interface AiConfig {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+}
+
+export function loadAiConfig(): AiConfig | null {
+  const data = readJson<Partial<AiConfig>>(KEYS.ai);
+  if (!data || typeof data.apiKey !== 'string' || typeof data.model !== 'string') return null;
+  if (!data.apiKey.trim() || !data.model.trim()) return null;
+  return {
+    apiKey: data.apiKey.trim().slice(0, 200),
+    baseUrl: (data.baseUrl ?? '').trim().slice(0, 300),
+    model: data.model.trim().slice(0, 100),
+  };
+}
+
+export function saveAiConfig(config: AiConfig): void {
+  writeJson(KEYS.ai, {
+    apiKey: config.apiKey.trim(),
+    baseUrl: config.baseUrl.trim(),
+    model: config.model.trim(),
+  });
+}
+
+export function clearAiConfig(): void {
+  try {
+    localStorage.removeItem(KEYS.ai);
+  } catch {
+    // ignore
+  }
+}
+
 export function clearAllLocalData(): void {
   try {
     localStorage.removeItem(KEYS.history);
     localStorage.removeItem(KEYS.favorites);
     localStorage.removeItem(KEYS.settings);
+    localStorage.removeItem(KEYS.ai);
   } catch {
     // ignore
   }

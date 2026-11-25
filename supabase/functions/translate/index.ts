@@ -28,6 +28,7 @@ interface TranslateRequest {
     relationship?: string;
     goal?: string;
   };
+  aiConfig?: { apiKey?: unknown; baseUrl?: unknown; model?: unknown };
 }
 
 interface TranslationData {
@@ -293,12 +294,20 @@ function extractJson(text: string): any | null {
 }
 
 async function callAi(req: TranslateRequest, env: Record<string, string | undefined>): Promise<any> {
-  const apiKey = env.AI_API_KEY;
-  const model = env.AI_MODEL;
-  const baseUrl = env.AI_BASE_URL || 'https://api.openai.com/v1';
+  const clientKey =
+    typeof req.aiConfig?.apiKey === 'string' ? req.aiConfig.apiKey.trim().slice(0, 200) : '';
+  const clientBase =
+    typeof req.aiConfig?.baseUrl === 'string' ? req.aiConfig.baseUrl.trim().slice(0, 300) : '';
+  const clientModel =
+    typeof req.aiConfig?.model === 'string' ? req.aiConfig.model.trim().slice(0, 100) : '';
+
+  const apiKey = clientKey || env.AI_API_KEY;
+  const model = clientModel || env.AI_MODEL;
+  const baseUrl =
+    (clientBase || env.AI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '');
 
   if (!apiKey || !model) {
-    throw { kind: 'not_configured' as const };
+    throw { kind: 'not_configured' as const, fromClient: Boolean(clientKey && clientModel) };
   }
 
   const controller = new AbortController();
@@ -421,12 +430,15 @@ Deno.serve(async (req: Request) => {
     const kind = e && typeof e === 'object' && 'kind' in e ? e.kind : 'network';
 
     if (kind === 'not_configured') {
+      const fromClient = e && typeof e === 'object' && e.fromClient === true;
       return corsResponse(
         {
           success: false,
           error: {
             code: 'AI_NOT_CONFIGURED',
-            message: 'AI 服务尚未配置，暂无法生成分析。',
+            message: fromClient
+              ? 'AI 服务连接失败，请检查「设置」里填写的 API Key、接口地址和模型名称是否正确。'
+              : 'AI 服务尚未配置，请到「设置」里填写 AI 服务的 API Key 和模型名称。',
           },
         },
         503
@@ -451,7 +463,10 @@ Deno.serve(async (req: Request) => {
       return corsResponse(
         {
           success: false,
-          error: { code: 'AI_AUTH_FAILED', message: 'AI 服务鉴权失败，请检查密钥配置。' },
+          error: {
+            code: 'AI_AUTH_FAILED',
+            message: 'AI 服务鉴权失败，请检查「设置」里填写的 API Key 是否有效。',
+          },
         },
         502
       );
